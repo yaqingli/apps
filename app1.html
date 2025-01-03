@@ -1,0 +1,487 @@
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">  
+    <title>ROC Curve Visualization</title>  
+    <script src="https://cdn.tailwindcss.com"></script>  
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>  
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>  
+    <style>  
+        .double-range-slider {  
+            position: relative;  
+            width: 100%;  
+            height: 40px;  
+        }  
+        .slider-track {  
+            position: absolute;  
+            top: 50%;  
+            transform: translateY(-50%);  
+            width: 100%;  
+            height: 4px;  
+            background: #ddd;  
+            border-radius: 2px;  
+        }  
+        .slider-range {  
+            position: absolute;  
+            top: 50%;  
+            transform: translateY(-50%);  
+            height: 4px;  
+            background: #4B5563;  
+            border-radius: 2px;  
+        }  
+        .slider-handle {  
+            position: absolute;  
+            top: 50%;  
+            width: 20px;  
+            height: 20px;  
+            transform: translate(-50%, -50%);  
+            background: #4B5563;  
+            border: 2px solid white;  
+            border-radius: 50%;  
+            cursor: pointer;  
+            z-index: 2;  
+        }  
+        .slider-handle:hover {  
+            background: #374151;  
+        }  
+        .slider-handle:active {  
+            cursor: grabbing;  
+        }  
+    </style>  
+</head>  
+<body class="bg-gray-50">  
+    <div class="container mx-auto p-4">  
+        <h1 class="text-2xl font-bold text-center mb-6">ROC曲线可视化</h1>  
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">  
+            <!-- 控制面板 -->  
+            <div class="bg-white p-6 rounded-lg shadow-md">  
+                <h2 class="text-xl font-bold mb-6">参数控制</h2>  
+                
+                <div class="space-y-6">  
+                    <!-- 数据生成控制 -->  
+                    <div class="space-y-4">  
+                        <div>  
+                            <label class="block text-sm font-medium text-gray-700 mb-2">总样本数</label>  
+                            <input  
+                                type="number"  
+                                id="totalSamples"  
+                                value="1000"  
+                                min="100"  
+                                max="10000"  
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"  
+                            />  
+                        </div>  
+
+                        <div>  
+                            <label class="block text-sm font-medium text-gray-700 mb-2">正样本比例</label>  
+                            <input  
+                                type="number"  
+                                id="positiveRatio"  
+                                value="0.5"  
+                                step="0.1"  
+                                min="0"  
+                                max="1"  
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"  
+                            />  
+                        </div>  
+                    </div>  
+
+                    <!-- 分布范围控制 -->  
+                    <div class="space-y-4">  
+                        <div>  
+                            <label class="block text-sm font-medium text-gray-700 mb-2">  
+                                正样本分数范围: <span id="posRangeValue" class="font-mono">0.6 - 0.9</span>  
+                            </label>  
+                            <div id="posRangeSlider" class="double-range-slider">  
+                                <div class="slider-track"></div>  
+                                <div class="slider-range"></div>  
+                                <div class="slider-handle" data-handle="min"></div>  
+                                <div class="slider-handle" data-handle="max"></div>  
+                            </div>  
+                        </div>  
+
+                        <div>  
+                            <label class="block text-sm font-medium text-gray-700 mb-2">  
+                                负样本分数范围: <span id="negRangeValue" class="font-mono">0.1 - 0.4</span>  
+                            </label>  
+                            <div id="negRangeSlider" class="double-range-slider">  
+                                <div class="slider-track"></div>  
+                                <div class="slider-range"></div>  
+                                <div class="slider-handle" data-handle="min"></div>  
+                                <div class="slider-handle" data-handle="max"></div>  
+                            </div>  
+                        </div>  
+                    </div>  
+
+                    <!-- 阈值控制 -->  
+                    <div>  
+                        <label class="block text-sm font-medium text-gray-700 mb-2">  
+                            阈值: <span id="thresholdValue" class="font-mono">0.500</span>  
+                        </label>  
+                        <input  
+                            type="range"  
+                            id="threshold"  
+                            min="0"  
+                            max="1"  
+                            step="0.001"  
+                            value="0.5"  
+                            class="w-full"  
+                        />  
+                    </div>  
+
+                    <!-- 指标显示 -->  
+                    <div class="bg-gray-50 p-4 rounded-lg space-y-2">  
+                        <h3 class="font-bold text-gray-700">当前指标</h3>  
+                        <div class="grid grid-cols-2 gap-4">  
+                            <div class="font-mono">  
+                                TPR: <span id="tprValue">0.000</span>  
+                            </div>  
+                            <div class="font-mono">  
+                                FPR: <span id="fprValue">0.000</span>  
+                            </div>  
+                            <div class="font-mono col-span-2">  
+                                AUC: <span id="aucValue">0.000</span>  
+                            </div>  
+                        </div>  
+                    </div>  
+                </div>  
+            </div>  
+
+            <!-- ROC曲线 -->  
+            <div class="bg-white p-6 rounded-lg shadow-md">  
+                <h2 class="text-xl font-bold mb-6">ROC曲线</h2>  
+                <canvas id="rocChart"></canvas>  
+            </div>  
+        </div>  
+    </div>  
+    <script>  
+        // 工具函数  
+        function normalRandom(mean, std) {  
+            let u = 0, v = 0;  
+            while (u === 0) u = Math.random();  
+            while (v === 0) v = Math.random();  
+            const num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);  
+            return num * std + mean;  
+        }  
+        
+        function clamp(value, min = 0, max = 1) {  
+            return Math.min(Math.max(value, min), max);  
+        }  
+        
+        // 双滑块控件类  
+        class DoubleRangeSlider {  
+            constructor(element, options = {}) {  
+                this.element = element;  
+                this.options = {  
+                    min: options.min || 0,  
+                    max: options.max || 1,  
+                    step: options.step || 0.001,  
+                    values: options.values || [0.3, 0.7],  
+                    onChange: options.onChange || (() => {})  
+                };  
+        
+                this.track = element.querySelector('.slider-track');  
+                this.range = element.querySelector('.slider-range');  
+                this.handles = element.querySelectorAll('.slider-handle');  
+                
+                this.initializeHandles();  
+                this.updateRange();  
+                this.setupEventListeners();  
+            }  
+        
+            initializeHandles() {  
+                this.handles[0].style.left = `${(this.options.values[0] - this.options.min) / (this.options.max - this.options.min) * 100}%`;  
+                this.handles[1].style.left = `${(this.options.values[1] - this.options.min) / (this.options.max - this.options.min) * 100}%`;  
+            }  
+        
+            updateRange() {  
+                const left = parseFloat(this.handles[0].style.left);  
+                const right = parseFloat(this.handles[1].style.left);  
+                this.range.style.left = `${left}%`;  
+                this.range.style.width = `${right - left}%`;  
+            }  
+        
+            setupEventListeners() {  
+                this.handles.forEach(handle => {  
+                    handle.addEventListener('mousedown', this.startDragging.bind(this));  
+                });  
+            }  
+        
+            startDragging(e) {  
+                const handle = e.target;  
+                const handleIndex = Array.from(this.handles).indexOf(handle);  
+                
+                const moveHandler = (moveEvent) => {  
+                    const rect = this.track.getBoundingClientRect();  
+                    let percent = (moveEvent.clientX - rect.left) / rect.width;  
+                    percent = Math.max(0, Math.min(1, percent));  
+                    
+                    const value = this.options.min + percent * (this.options.max - this.options.min);  
+                    const steppedValue = Math.round(value / this.options.step) * this.options.step;  
+                    const steppedPercent = (steppedValue - this.options.min) / (this.options.max - this.options.min);  
+        
+                    if (handleIndex === 0 && steppedPercent < parseFloat(this.handles[1].style.left) / 100) {  
+                        handle.style.left = `${steppedPercent * 100}%`;  
+                        this.options.values[0] = steppedValue;  
+                    } else if (handleIndex === 1 && steppedPercent > parseFloat(this.handles[0].style.left) / 100) {  
+                        handle.style.left = `${steppedPercent * 100}%`;  
+                        this.options.values[1] = steppedValue;  
+                    }  
+        
+                    this.updateRange();  
+                    this.options.onChange(this.options.values);  
+                };  
+        
+                const stopDragging = () => {  
+                    document.removeEventListener('mousemove', moveHandler);  
+                    document.removeEventListener('mouseup', stopDragging);  
+                };  
+        
+                document.addEventListener('mousemove', moveHandler);  
+                document.addEventListener('mouseup', stopDragging);  
+            }  
+        
+            getValues() {  
+                return this.options.values;  
+            }  
+        }  
+        
+        // 数据生成和ROC计算函数  
+        function generateData() {  
+            const total = parseInt(document.getElementById('totalSamples').value);  
+            const posRatio = parseFloat(document.getElementById('positiveRatio').value);  
+            const posCount = Math.round(total * posRatio);  
+            const negCount = total - posCount;  
+        
+            const posRange = posRangeSlider.getValues();  
+            const negRange = negRangeSlider.getValues();  
+        
+            const posMean = (posRange[0] + posRange[1]) / 2;  
+            const posStd = (posRange[1] - posRange[0]) / 4;  
+            
+            const negMean = (negRange[0] + negRange[1]) / 2;  
+            const negStd = (negRange[1] - negRange[0]) / 4;  
+        
+            const posData = Array(posCount).fill().map(() => ({  
+                actual: 1,  
+                score: clamp(normalRandom(posMean, posStd))  
+            }));  
+        
+            const negData = Array(negCount).fill().map(() => ({  
+                actual: 0,  
+                score: clamp(normalRandom(negMean, negStd))  
+            }));  
+        
+            return [...posData, ...negData];  
+        }  
+        
+        function calculateROCPoints(data) {  
+            const points = [];  
+            const thresholds = Array.from({length: 1001}, (_, i) => i / 1000); // 0到1，步长0.001  
+            
+            for (const threshold of thresholds) {  
+                const tp = data.filter(d => d.actual === 1 && d.score >= threshold).length;  
+                const fn = data.filter(d => d.actual === 1 && d.score < threshold).length;  
+                const fp = data.filter(d => d.actual === 0 && d.score >= threshold).length;  
+                const tn = data.filter(d => d.actual === 0 && d.score < threshold).length;  
+        
+                const tpr = tp / (tp + fn) || 0;  
+                const fpr = fp / (fp + tn) || 0;  
+        
+                points.push({x: fpr, y: tpr});  
+            }  
+            
+            return points.sort((a, b) => a.x - b.x);  
+        }  
+        
+        function calculateAUC(points) {  
+            let auc = 0;  
+            for (let i = 1; i < points.length; i++) {  
+                const width = points[i].x - points[i-1].x;  
+                const height = (points[i].y + points[i-1].y) / 2;  
+                auc += width * height;  
+            }  
+            return auc;  
+        }  
+
+        // 全局变量存储当前数据  
+let currentData = [];  
+let currentROCPoints = [];  
+
+// 图表配置  
+const chartConfig = {  
+    type: 'line',  
+    data: {  
+        datasets: [{  
+            label: 'ROC曲线',  
+            data: [],  
+            borderColor: 'rgb(75, 192, 192)',  
+            borderWidth: 2,  
+            tension: 0.1,  
+            pointRadius: 0,  
+            fill: false  
+        },  
+        {  
+            label: '当前阈值点',  
+            data: [{x: 0.5, y: 0.5}],  
+            backgroundColor: 'red',  
+            pointRadius: 6,  
+            pointStyle: 'circle',  
+            showLine: false  
+        }]  
+    },  
+    options: {  
+        responsive: true,  
+        aspectRatio: 1,  
+        scales: {  
+            x: {  
+                type: 'linear',  
+                position: 'bottom',  
+                min: 0,  
+                max: 1,  
+                ticks: {  
+                    stepSize: 0.1  
+                },  
+                title: {  
+                    display: true,  
+                    text: 'False Positive Rate'  
+                },  
+                grid: {  
+                    display: true,  
+                    drawOnChartArea: true  
+                }  
+            },  
+            y: {  
+                min: 0,  
+                max: 1,  
+                ticks: {  
+                    stepSize: 0.1  
+                },  
+                title: {  
+                    display: true,  
+                    text: 'True Positive Rate'  
+                },  
+                grid: {  
+                    display: true,  
+                    drawOnChartArea: true  
+                }  
+            }  
+        },  
+        plugins: {  
+            annotation: {  
+                annotations: {}  
+            },  
+            tooltip: {  
+                callbacks: {  
+                    label: function(context) {  
+                        const point = context.raw;  
+                        return `TPR: ${point.y.toFixed(3)}, FPR: ${point.x.toFixed(3)}`;  
+                    }  
+                }  
+            }  
+        }  
+    }  
+};  
+
+// 创建图表实例  
+const rocChart = new Chart(document.getElementById('rocChart').getContext('2d'), chartConfig);  
+
+// 初始化双滑块  
+const posRangeSlider = new DoubleRangeSlider(document.getElementById('posRangeSlider'), {  
+    values: [0.6, 0.9],  
+    onChange: (values) => {  
+        document.getElementById('posRangeValue').textContent = `${values[0].toFixed(2)} - ${values[1].toFixed(2)}`;  
+        regenerateData();  
+    }  
+});  
+
+const negRangeSlider = new DoubleRangeSlider(document.getElementById('negRangeSlider'), {  
+    values: [0.1, 0.4],  
+    onChange: (values) => {  
+        document.getElementById('negRangeValue').textContent = `${values[0].toFixed(2)} - ${values[1].toFixed(2)}`;  
+        regenerateData();  
+    }  
+});  
+
+// 生成新数据并更新ROC曲线  
+function regenerateData() {  
+    currentData = generateData();  
+    currentROCPoints = calculateROCPoints(currentData);  
+    
+    // 更新ROC曲线数据  
+    rocChart.data.datasets[0].data = currentROCPoints;  
+    
+    // 计算并更新AUC值  
+    const aucValue = calculateAUC(currentROCPoints);  
+    document.getElementById('aucValue').textContent = aucValue.toFixed(3);  
+    
+    // 更新当前阈值点  
+    updateThresholdPoint();  
+}  
+
+// 更新阈值点和指标  
+function updateThresholdPoint() {  
+    const currentThreshold = parseFloat(document.getElementById('threshold').value);  
+    
+    // 计算当前阈值的TPR和FPR  
+    const tp = currentData.filter(d => d.actual === 1 && d.score >= currentThreshold).length;  
+    const fn = currentData.filter(d => d.actual === 1 && d.score < currentThreshold).length;  
+    const fp = currentData.filter(d => d.actual === 0 && d.score >= currentThreshold).length;  
+    const tn = currentData.filter(d => d.actual === 0 && d.score < currentThreshold).length;  
+
+    const tpr = tp / (tp + fn) || 0;  
+    const fpr = fp / (fp + tn) || 0;  
+
+    // 更新当前点  
+    rocChart.data.datasets[1].data = [{x: fpr, y: tpr}];  
+    
+    // 更新注释线  
+    rocChart.options.plugins.annotation.annotations = {  
+        vLine: {  
+            type: 'line',  
+            scaleID: 'x',  
+            value: fpr,  
+            borderColor: 'rgba(255, 0, 0, 0.5)',  
+            borderWidth: 1,  
+            borderDash: [5, 5],  
+            label: {  
+                content: `FPR: ${fpr.toFixed(3)}`,  
+                enabled: true,  
+                position: 'bottom'  
+            }  
+        },  
+        hLine: {  
+            type: 'line',  
+            scaleID: 'y',  
+            value: tpr,  
+            borderColor: 'rgba(255, 0, 0, 0.5)',  
+            borderWidth: 1,  
+            borderDash: [5, 5],  
+            label: {  
+                content: `TPR: ${tpr.toFixed(3)}`,  
+                enabled: true,  
+                position: 'left'  
+            }  
+        }  
+    };  
+    
+    // 更新显示值  
+    document.getElementById('thresholdValue').textContent = currentThreshold.toFixed(3);  
+    document.getElementById('tprValue').textContent = tpr.toFixed(3);  
+    document.getElementById('fprValue').textContent = fpr.toFixed(3);  
+    
+    rocChart.update();  
+}  
+
+// 事件监听  
+document.getElementById('threshold').addEventListener('input', updateThresholdPoint);  
+document.getElementById('totalSamples').addEventListener('input', regenerateData);  
+document.getElementById('positiveRatio').addEventListener('input', regenerateData);  
+
+// 初始化  
+regenerateData();  
+
+        </script>
+</body>  
+</html>
